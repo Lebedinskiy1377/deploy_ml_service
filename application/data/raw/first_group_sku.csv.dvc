@@ -1,0 +1,5 @@
+outs:
+- md5: e48e52a66cdb5314045cfef7edc34896
+  size: 6720
+  hash: md5
+  path: first_group_sku.csv

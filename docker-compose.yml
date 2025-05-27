@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  db:
+    container_name: pg_container
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /data/postgres
+    volumes:
+      - postgres:/data/postgres
+    ports:
+      - "5433:5432"
+
+  minio:
+    container_name: minio
+    image: quay.io/minio/minio:RELEASE.2022-05-08T23-50-31Z
+    command: server --console-address ":9001" /data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
+      MINIO_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - ./minio:/data
+
+  mlflow:
+    container_name: mlflow_server
+    restart: always
+    build: ./mlflow_image
+    image: mlflow_server
+    ports:
+      - "5000:5000"
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
+      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+    command: mlflow server --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB} --default-artifact-root s3://${AWS_S3_BUCKET}/ --host 0.0.0.0
+
+  app:
+    container_name: fastapi
+    restart: always
+    build: ./sku_price_model_service
+    image: sku_price_model_service
+    ports:
+      - "8005:8005"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow_server:5000
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
+      - MINIO_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+      - MINIO_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+
+  front:
+    container_name: front
+    restart: always
+    build: ./frontend_ml
+    image: streamlit
+    ports:
+      - "8501:8501"
+
+
+volumes:
+  postgres:
+  my-data:
