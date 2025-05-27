@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/0/26d9d74e2e534eceb34430b425e88315/artifacts
+end_time: 1716490443791
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 26d9d74e2e534eceb34430b425e88315
+run_name: sassy-hen-56
+run_uuid: 26d9d74e2e534eceb34430b425e88315
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716490436058
+status: 3
+tags: []
+user_id: lebed

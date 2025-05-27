@@ -1,0 +1,5 @@
+outs:
+- md5: 4cc4b0bc90a2ed9aff4b9c59a6762173
+  size: 740091
+  hash: md5
+  path: sku_dict.csv

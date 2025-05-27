@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/759256e0c29345bf80d9d44c8e6b6c2f/artifacts
+end_time: 1716397623071
+entry_point_name: ''
+experiment_id: '528458188783558310'
+lifecycle_stage: active
+run_id: 759256e0c29345bf80d9d44c8e6b6c2f
+run_name: adaptable-turtle-664
+run_uuid: 759256e0c29345bf80d9d44c8e6b6c2f
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716397622097
+status: 3
+tags: []
+user_id: lebed

@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/0ed0bc6374fa45aca399100b14417777/artifacts
+end_time: 1716396800408
+entry_point_name: ''
+experiment_id: '528458188783558310'
+lifecycle_stage: active
+run_id: 0ed0bc6374fa45aca399100b14417777
+run_name: masked-flea-511
+run_uuid: 0ed0bc6374fa45aca399100b14417777
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716396757640
+status: 3
+tags: []
+user_id: lebed

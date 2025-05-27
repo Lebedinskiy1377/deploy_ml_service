@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/de5b7bdc9b57453193bafc7fd1a809c6/artifacts
+end_time: 1716397529622
+entry_point_name: ''
+experiment_id: '528458188783558310'
+lifecycle_stage: active
+run_id: de5b7bdc9b57453193bafc7fd1a809c6
+run_name: thoughtful-bass-371
+run_uuid: de5b7bdc9b57453193bafc7fd1a809c6
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716397528731
+status: 3
+tags: []
+user_id: lebed

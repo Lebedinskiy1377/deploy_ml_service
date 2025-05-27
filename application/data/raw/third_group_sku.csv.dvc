@@ -1,0 +1,5 @@
+outs:
+- md5: 296bd6f636c573ea58e4e0217f2c07ad
+  size: 76215
+  hash: md5
+  path: third_group_sku.csv

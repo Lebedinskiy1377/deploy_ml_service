@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/bca0ddb5a06f4453b0a8d3bcae8d14d8/artifacts
+end_time: 1716397716201
+entry_point_name: ''
+experiment_id: '528458188783558310'
+lifecycle_stage: active
+run_id: bca0ddb5a06f4453b0a8d3bcae8d14d8
+run_name: placid-robin-751
+run_uuid: bca0ddb5a06f4453b0a8d3bcae8d14d8
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716397708799
+status: 3
+tags: []
+user_id: lebed

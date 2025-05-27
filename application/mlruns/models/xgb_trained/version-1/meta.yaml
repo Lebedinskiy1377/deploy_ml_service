@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1716490443772
+current_stage: None
+description: null
+last_updated_timestamp: 1716490443772
+name: xgb_trained
+run_id: 26d9d74e2e534eceb34430b425e88315
+run_link: null
+source: file:///D:/deploy_ml_service/application/mlruns/0/26d9d74e2e534eceb34430b425e88315/artifacts/model
+status: READY
+status_message: null
+storage_location: file:///D:/deploy_ml_service/application/mlruns/0/26d9d74e2e534eceb34430b425e88315/artifacts/model
+user_id: null
+version: 1

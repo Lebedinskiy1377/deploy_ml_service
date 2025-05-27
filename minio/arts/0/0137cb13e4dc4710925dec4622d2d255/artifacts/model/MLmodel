@@ -1,0 +1,32 @@
+artifact_path: model
+flavors:
+  lightgbm:
+    code: null
+    data: model.pkl
+    lgb_version: 4.6.0
+    model_class: lightgbm.sklearn.LGBMRegressor
+  python_function:
+    data: model.pkl
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.lightgbm
+    python_version: 3.11.4
+mlflow_version: 2.12.2
+model_size_bytes: 170996
+model_uuid: 16470b4ba7e34d7eb56b3a35cca66e00
+run_id: 0137cb13e4dc4710925dec4622d2d255
+signature:
+  inputs: '[{"type": "long", "name": "SKU", "required": true}, {"type": "long", "name":
+    "week_num", "required": true}, {"type": "long", "name": "year", "required": true},
+    {"type": "double", "name": "discount", "required": true}, {"type": "string", "name":
+    "fincode", "required": true}, {"type": "string", "name": "ui1_code", "required":
+    true}, {"type": "string", "name": "ui2_code", "required": true}, {"type": "string",
+    "name": "ui3_code", "required": true}, {"type": "string", "name": "vendor", "required":
+    true}, {"type": "string", "name": "brand_code", "required": true}, {"type": "long",
+    "name": "week_num_expiration", "required": true}, {"type": "long", "name": "year_expiration",
+    "required": true}, {"type": "long", "name": "week_num_creation", "required": true},
+    {"type": "long", "name": "year_creation", "required": true}]'
+  outputs: '[{"type": "tensor", "tensor-spec": {"dtype": "float64", "shape": [-1]}}]'
+  params: null
+utc_time_created: '2025-05-04 00:54:58.013267'

@@ -1,0 +1,6 @@
+artifact_location: file:///D:/deploy_ml_service/application/mlruns/528458188783558310
+creation_time: 1716396717754
+experiment_id: '528458188783558310'
+last_update_time: 1716396717754
+lifecycle_stage: active
+name: sku_price_predict-default

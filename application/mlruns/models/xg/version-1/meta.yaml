@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1716405743567
+current_stage: None
+description: null
+last_updated_timestamp: 1716405743567
+name: xg
+run_id: d00fd5f05b744787bd59c1f4fc48e265
+run_link: null
+source: file:///D:/deploy_ml_service/application/mlruns/0/d00fd5f05b744787bd59c1f4fc48e265/artifacts/xg
+status: READY
+status_message: null
+storage_location: file:///D:/deploy_ml_service/application/mlruns/0/d00fd5f05b744787bd59c1f4fc48e265/artifacts/xg
+user_id: null
+version: 1

@@ -1,0 +1,14 @@
+aliases: []
+creation_timestamp: 1716397716181
+current_stage: None
+description: null
+last_updated_timestamp: 1716397716181
+name: sku_price_predict-default
+run_id: bca0ddb5a06f4453b0a8d3bcae8d14d8
+run_link: null
+source: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/bca0ddb5a06f4453b0a8d3bcae8d14d8/artifacts/sku_price_predict-default
+status: READY
+status_message: null
+storage_location: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/bca0ddb5a06f4453b0a8d3bcae8d14d8/artifacts/sku_price_predict-default
+user_id: null
+version: 1

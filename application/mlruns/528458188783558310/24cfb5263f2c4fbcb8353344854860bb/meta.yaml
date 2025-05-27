@@ -1,0 +1,15 @@
+artifact_uri: file:///D:/deploy_ml_service/application/mlruns/528458188783558310/24cfb5263f2c4fbcb8353344854860bb/artifacts
+end_time: 1716396718601
+entry_point_name: ''
+experiment_id: '528458188783558310'
+lifecycle_stage: active
+run_id: 24cfb5263f2c4fbcb8353344854860bb
+run_name: silent-calf-430
+run_uuid: 24cfb5263f2c4fbcb8353344854860bb
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1716396718453
+status: 3
+tags: []
+user_id: lebed
