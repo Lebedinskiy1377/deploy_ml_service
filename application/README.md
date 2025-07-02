@@ -1,7 +1,7 @@
 price_forecast_ml_web_service
 ==============================
 
-ML web service for sku price forecast
+ML CLI training library for demand forecast
 
 Project Organization
 ------------
