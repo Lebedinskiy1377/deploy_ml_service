@@ -1,4 +1,4 @@
-# Dynamic Pricing System for E-Commerce
+# Dynamic Pricing System for E-Commerce (дипломная работа)
 
 📊 Машинное обучение для прогноза спроса и оптимизации цен с учётом бизнес-ограничений
 
