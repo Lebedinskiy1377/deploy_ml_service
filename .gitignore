@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local configuration
+.env
+!.env.example
+
+# IDE files
+.idea/
+.vscode/
+
+# Local service state and generated artifacts
+minio/
+mlruns/
+application/mlruns/
+sku_price_model_service/mlruns/
+
+# Accidentally copied virtual environments
+sku_price_model_service/Scripts/
+sku_price_model_service/Lib/
+sku_price_model_service/pyvenv.cfg
+
+# OS files
+.DS_Store
