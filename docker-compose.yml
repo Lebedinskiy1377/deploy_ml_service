@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     container_name: pg_container
@@ -38,8 +36,11 @@ services:
     restart: always
     build: ./mlflow_image
     image: mlflow_server
+    depends_on:
+      - db
+      - minio
     ports:
-      - "5000:5000"
+      - "5001:5000"
     environment:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
@@ -53,23 +54,55 @@ services:
     restart: always
     build: ./sku_price_model_service
     image: sku_price_model_service
+    depends_on:
+      - db
+      - minio
+      - mlflow
     ports:
       - "8005:8005"
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow_server:5000
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
       - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - MINIO_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
-      - MINIO_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
 
   front:
     container_name: front
     restart: always
     build: ./frontend_ml
     image: streamlit
+    depends_on:
+      - app
     ports:
       - "8501:8501"
+    environment:
+      - FASTAPI_BASE_URL=http://app:8005
+
+  seed:
+    image: sku_price_model_service
+    profiles:
+      - tools
+    depends_on:
+      - db
+    entrypoint: ["python"]
+    command:
+      - /workspace/scripts/seed_demo_db.py
+      - --data-path
+      - /workspace/application/notebooks/data.csv
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    volumes:
+      - .:/workspace:ro
 
 
 volumes:
   postgres:
-  my-data:

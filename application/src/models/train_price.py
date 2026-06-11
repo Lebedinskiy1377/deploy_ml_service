@@ -16,8 +16,8 @@ RANDOM_STATE = 42
 TRAIN_SIZE = 0.9
 
 remote_server_uri = os.getenv("MLFLOW_TRACKING_URI")
-mlflow.set_tracking_uri("http://localhost:5000")
-os.environ['MLFLOW_S3_ENDPOINT_URL'] = "http://localhost:9000"
+mlflow.set_tracking_uri(remote_server_uri or "http://localhost:5000")
+os.environ.setdefault('MLFLOW_S3_ENDPOINT_URL', "http://localhost:9000")
 
 
 def calculate_price_elasticity(

@@ -1,0 +1,11 @@
+.idea/
+Scripts/
+Lib/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.env
+mlruns/
+pyvenv.cfg

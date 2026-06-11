@@ -1,130 +1,130 @@
 import logging
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from typing import List, Dict, Any
-from demand_predictor import DemandPredictor
+
+from config import (
+    CATEGORICAL_FEATURES,
+    DEFAULT_MARGIN_PENALTY,
+    DEFAULT_PRICE_CANDIDATE_COUNT,
+    DEFAULT_PRICE_CHANGE_LIMIT,
+    DEFAULT_TARGET_MARGIN,
+    FEATURES,
+)
 from db import engine
+from demand_predictor import DemandPredictor
+
+logger = logging.getLogger(__name__)
+
+
+def _prepare_model_row(row: pd.Series) -> pd.DataFrame:
+    row_data = pd.DataFrame([{feature: row[feature] for feature in FEATURES}])
+
+    row_data["SKU"] = row_data["SKU"].astype(np.int64)
+    row_data["week_num"] = row_data["week_num"].astype(np.uint32)
+    row_data["year"] = row_data["year"].astype(np.int32)
+    row_data["discount"] = row_data["discount"].astype(np.float64)
+    row_data["week_num_expiration"] = row_data["week_num_expiration"].astype(np.uint32)
+    row_data["year_expiration"] = row_data["year_expiration"].astype(np.int32)
+    row_data["week_num_creation"] = row_data["week_num_creation"].astype(np.uint32)
+    row_data["year_creation"] = row_data["year_creation"].astype(np.int32)
+    row_data["day"] = row_data["day"].astype(np.int32)
+    row_data["month"] = row_data["month"].astype(np.int32)
+    row_data["weekday"] = row_data["weekday"].astype(np.int32)
+    row_data["price"] = row_data["price"].astype(np.float64)
+
+    for column in CATEGORICAL_FEATURES:
+        row_data[column] = row_data[column].astype("category")
+
+    return row_data
+
+
+def _score_candidate(
+    price: float,
+    demand: float,
+    cost: float,
+    lambda_param: float,
+    target_margin: float,
+) -> tuple[float, float]:
+    margin = (price - cost) / price if price > 0 else 0.0
+    penalty = lambda_param * max(0.0, target_margin - margin)
+    score = price * demand * (1 - penalty)
+
+    return score, margin
 
 
 def optimize_price(
-        data: pd.DataFrame,
-        predictor: DemandPredictor,
-        lambda_param: float = 0.5,
-        target_margin: float = 0.5,
-) -> List[Dict[str, Any]]:
+    data: pd.DataFrame,
+    predictor: DemandPredictor,
+    lambda_param: float = DEFAULT_MARGIN_PENALTY,
+    target_margin: float = DEFAULT_TARGET_MARGIN,
+    price_change_limit: float = DEFAULT_PRICE_CHANGE_LIMIT,
+    price_candidate_count: int = DEFAULT_PRICE_CANDIDATE_COUNT,
+) -> pd.DataFrame:
     """
-    Оптимизирует цену для каждого SKU, максимизируя функцию полезности f(gmv, margin),
-    и генерирует визуализацию зависимости спроса, GMV и функции полезности от цены.
-
-    Args:
-        data (pd.DataFrame): Обработанные данные с признаками для каждого SKU.
-        predictor (DemandPredictor): Модель для прогнозирования спроса.
-        lambda_param (float): Коэффициент штрафа за отклонение от целевой маржи.
-        target_margin (float): Целевая маржа (например, 0.3 для 30%).
-
-    Returns:
-        List[Dict[str, Any]]: Список словарей с оптимальными ценами, метриками и ссылками на графики.
+    Optimizes each SKU price by maximizing a GMV-based score with a margin penalty.
     """
-    results: List[Dict[str, Any]] = []
-    prices: pd.DataFrame = pd.read_sql_query("SELECT * FROM prices", engine)
+    prices: pd.DataFrame = pd.read_sql_query(
+        "SELECT SKU, price_per_sku, cost FROM prices",
+        engine,
+    )
+    data = pd.merge(data, prices, on="SKU", how="left")
 
-    data = pd.merge(data, prices, on='SKU', how='left')
+    if data[["price_per_sku", "cost"]].isna().any(axis=None):
+        missing_skus = data.loc[
+            data[["price_per_sku", "cost"]].isna().any(axis=1),
+            "SKU",
+        ].unique()
+        raise ValueError(f"Missing price or cost data for SKU: {', '.join(map(str, missing_skus))}")
 
-    data['base_demand'] = predictor.predict(data[['SKU', 'week_num', 'year', 'discount', 'fincode', 'ui1_code',
-         'ui2_code', 'ui3_code', 'vendor', 'brand_code', 'week_num_expiration',
-         'year_expiration', 'week_num_creation', 'year_creation', 'day',
-         'month', 'weekday', 'price']])
+    data["base_demand"] = predictor.predict(data[list(FEATURES)])
 
-    for idx, row in data.iterrows():
-        sku: np.int64 = np.int64(row['SKU'])
-        week_num: np.uint32 = np.uint32(row['week_num'])
-        year: np.int32 = np.int32(row['year'])
-        discount: np.float64 = np.float64(row['discount'])
-        fincode: str = str(row['fincode'])
-        ui1_code: str = str(row['ui1_code'])
-        ui2_code: str = str(row['ui2_code'])
-        ui3_code: str = str(row['ui3_code'])
-        vendor: str = str(row['vendor'])
-        brand_code: str = str(row['brand_code'])
-        week_num_expiration: np.uint32 = np.uint32(row['week_num_expiration'])
-        year_expiration: np.int32 = np.int32(row['year_expiration'])
-        week_num_creation: np.uint32 = np.uint32(row['week_num_creation'])
-        year_creation: np.int32 = np.int32(row['year_creation'])
-        day: np.int32 = np.int32(row['day'])
-        month: np.int32 = np.int32(row['month'])
-        weekday: np.int32 = np.int32(row['weekday'])
-        base_price: np.float64 = np.float64(row['price'])
-        cost: np.float64 = np.float64(row['cost'])
-        base_demand: np.float64 = np.float64(row['base_demand'])
+    results: list[dict[str, Any]] = []
+    for _, row in data.iterrows():
+        sku = int(row["SKU"])
+        base_price = float(row["price"])
+        cost = float(row["cost"])
 
-        row_data = pd.DataFrame({
-            'SKU': [sku],
-            'week_num': [week_num],
-            'year': [year],
-            'discount': [discount],
-            'fincode': [fincode],
-            'ui1_code': [ui1_code],
-            'ui2_code': [ui2_code],
-            'ui3_code': [ui3_code],
-            'vendor': [vendor],
-            'brand_code': [brand_code],
-            'week_num_expiration': [week_num_expiration],
-            'year_expiration': [year_expiration],
-            'week_num_creation': [week_num_creation],
-            'year_creation': [year_creation],
-            'day': [day],
-            'month': [month],
-            'weekday': [weekday],
-            'price': [base_price]
-        })
+        if base_price <= 0:
+            raise ValueError(f"Base price must be greater than zero for SKU {sku}")
 
-        row_data['SKU'] = row_data['SKU'].astype(np.int64)
-        row_data['week_num'] = row_data['week_num'].astype(np.uint32)
-        row_data['year'] = row_data['year'].astype(np.int32)
-        row_data['discount'] = row_data['discount'].astype(np.float64)
-        row_data['fincode'] = row_data['fincode'].astype('category')
-        row_data['ui1_code'] = row_data['ui1_code'].astype('category')
-        row_data['ui2_code'] = row_data['ui2_code'].astype('category')
-        row_data['ui3_code'] = row_data['ui3_code'].astype('category')
-        row_data['vendor'] = row_data['vendor'].astype('category')
-        row_data['brand_code'] = row_data['brand_code'].astype('category')
-        row_data['week_num_expiration'] = row_data['week_num_expiration'].astype(np.uint32)
-        row_data['year_expiration'] = row_data['year_expiration'].astype(np.int32)
-        row_data['week_num_creation'] = row_data['week_num_creation'].astype(np.uint32)
-        row_data['year_creation'] = row_data['year_creation'].astype(np.int32)
-        row_data['day'] = row_data['day'].astype(np.int32)
-        row_data['month'] = row_data['month'].astype(np.int32)
-        row_data['weekday'] = row_data['weekday'].astype(np.int32)
-        row_data['price'] = row_data['price'].astype(np.float64)
+        price_candidates = np.linspace(
+            base_price * (1 - price_change_limit),
+            base_price * (1 + price_change_limit),
+            price_candidate_count,
+        )
 
-        price_candidates: np.ndarray = np.linspace(base_price * 0.7, base_price * 1.3, 30)
+        row_data = _prepare_model_row(row)
+        demands = predictor.adjust_demand_with_price(row_data, price_candidates)
+        demands = np.nan_to_num(demands, nan=0.0, posinf=0.0, neginf=0.0)
+        logger.debug("SKU %s candidate prices=%s demands=%s", sku, price_candidates, demands)
 
-        demands: np.ndarray = predictor.adjust_demand_with_price(row_data, price_candidates)
-        print(f'prices: {price_candidates}, demands: {demands}')
+        scores = np.zeros_like(price_candidates)
+        margins = np.zeros_like(price_candidates)
+        for idx, (price, demand) in enumerate(zip(price_candidates, demands)):
+            scores[idx], margins[idx] = _score_candidate(
+                price=float(price),
+                demand=float(demand),
+                cost=cost,
+                lambda_param=lambda_param,
+                target_margin=target_margin,
+            )
 
-        scores: np.ndarray = np.zeros_like(price_candidates)
-        margins: np.ndarray = np.zeros_like(price_candidates)
+        best_idx = int(np.argmax(scores))
+        best_price = float(price_candidates[best_idx])
+        best_demand = float(demands[best_idx])
 
-        for i, (price, demand) in enumerate(zip(price_candidates, demands)):
-            margin: np.float64 = (price - cost) / price if price > 0 else 0.0
-            margins[i] = margin
-            penalty: np.float64 = lambda_param * max(0, target_margin - margin)
-            scores[i] = price * demand * (1 - penalty)
+        results.append(
+            {
+                "SKU": sku,
+                "optimal_price": best_price,
+                "expected_demand": best_demand,
+                "gmv": best_price * best_demand,
+                "margin": float(margins[best_idx]),
+                "score": float(scores[best_idx]),
+                "base_demand": float(row["base_demand"]),
+            }
+        )
 
-        best_idx: int = np.argmax(scores)
-        best_price: np.float64 = price_candidates[best_idx]
-        best_demand: np.float64 = demands[best_idx]
-        best_score: np.float64 = scores[best_idx]
-
-        results.append({
-            'SKU': int(sku),
-            'optimal_price': float(best_price),
-            'expected_demand': float(best_demand),
-            'gmv': float(best_price * best_demand),
-            'margin': float((best_price - cost) / best_price if best_price > 0 else 0.0),
-            'score': float(best_score),
-            'base_demand': base_demand,
-        })
-
-    return pd.DataFrame(results).merge(prices, on='SKU', how='left')
+    return pd.DataFrame(results).merge(prices, on="SKU", how="left")

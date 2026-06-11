@@ -19,8 +19,8 @@ RANDOM_STATE = 42
 TRAIN_SIZE = 0.9
 
 remote_server_uri = os.getenv("MLFLOW_TRACKING_URI")
-mlflow.set_tracking_uri("http://localhost:5000")
-os.environ['MLFLOW_S3_ENDPOINT_URL'] = "http://localhost:9000"
+mlflow.set_tracking_uri(remote_server_uri or "http://localhost:5000")
+os.environ.setdefault('MLFLOW_S3_ENDPOINT_URL', "http://localhost:9000")
 
 
 def job(
@@ -66,9 +66,6 @@ def job(
 
         mlflow.log_param('features', list(X_train.columns))
         mlflow.log_param('target', target)
-
-        print(X_train.columns)
-        print(X_train.dtypes)
 
         tscv = TimeSeriesSplit(n_splits=5)
 
