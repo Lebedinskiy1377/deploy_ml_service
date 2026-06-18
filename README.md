@@ -47,7 +47,7 @@ cp .env.example .env
 2. Поднять сервисы:
 
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 
 3. Загрузить demo-таблицы `promo`, `sku_dict`, `prices` в PostgreSQL:
@@ -56,7 +56,19 @@ docker compose up --build
 docker compose run --rm seed
 ```
 
-4. Открыть интерфейс:
+4. Обучить и зарегистрировать модель спроса:
+
+```bash
+docker compose run --rm trainer
+```
+
+Для быстрой проверки pipeline без полного подбора гиперпараметров:
+
+```bash
+docker compose run --rm trainer --n-trials 1 --cv-splits 3 --max-estimators 300
+```
+
+5. Открыть интерфейс:
 
 ```text
 http://localhost:8501
@@ -70,7 +82,11 @@ http://localhost:8501
 
 ## ML-логика
 
-Модель спроса использует признаки SKU, даты, промо, категории, бренда, поставщика и цены. При оптимизации цена перебирается в диапазоне `70%..130%` от базовой цены. Для кандидата считается:
+Модель спроса обучается на `application/notebooks/data.csv`. Последние 10% дат используются как holdout, более ранние даты - для time-series cross-validation и Optuna. Колонка `margin` не попадает в признаки, а цена имеет монотонное ограничение `-1`: при прочих равных рост цены не должен повышать прогноз спроса.
+
+После оценки на holdout модель переобучается на полном датасете, регистрируется в MLflow как `lgb_for_inference` и получает alias `champion`.
+
+При оптимизации цена перебирается в диапазоне `70%..130%` от базовой цены. Для кандидата считается:
 
 ```text
 GMV = candidate_price * expected_demand
@@ -80,9 +96,15 @@ score = GMV * (1 - lambda * max(0, target_margin - margin))
 
 По умолчанию `target_margin = 0.5`, `lambda = 0.5`, количество кандидатов цены - `30`.
 
+## Данные
+
+- `application/notebooks/data.csv` - полный датасет из 6699 наблюдений; это источник для обучения.
+- `application/train.csv` - историческая производная выборка из первых 90% строк. Канонический pipeline ее не использует.
+- `application/data/raw/*.csv.dvc` и `application/data/processed/*.csv.dvc` - DVC-указатели, а не сами CSV.
+
 ## Важные замечания
 
-- Для полноценного запуска нужны данные в PostgreSQL и зарегистрированная MLflow-модель `lgb_for_inference` в stage `Staging`.
-- Demo-таблицы PostgreSQL можно загрузить командой `docker compose run --rm seed`; MLflow-модель эта команда не обучает и не регистрирует.
+- Demo-таблицы PostgreSQL загружаются командой `docker compose run --rm seed`.
+- Модель обучается и регистрируется командой `docker compose run --rm trainer`.
 - В репозитории исторически присутствуют MLflow/MinIO/IDE/venv-артефакты. Новые такие файлы игнорируются через `.gitignore`, но уже отслеживаемые артефакты лучше выносить отдельным cleanup-коммитом.
 - Бизнес-смысл проекта не в ручном назначении цены, а в сравнении ценовых сценариев по спросу, GMV и марже.

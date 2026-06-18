@@ -4,12 +4,12 @@ import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from typing import Any
 
-from config import MODEL_NAME, MODEL_STAGE
+from config import MODEL_ALIAS, MODEL_NAME
 
 
 class DemandPredictor:
-    def __init__(self, model_name: str = MODEL_NAME, model_stage: str = MODEL_STAGE) -> None:
-        self.model: Any = mlflow.pyfunc.load_model(f"models:/{model_name}/{model_stage}")
+    def __init__(self, model_name: str = MODEL_NAME, model_alias: str = MODEL_ALIAS) -> None:
+        self.model: Any = mlflow.pyfunc.load_model(f"models:/{model_name}@{model_alias}")
 
     def predict(self, data: pd.DataFrame) -> np.ndarray:
         return np.asarray(self.model.predict(data), dtype=float)

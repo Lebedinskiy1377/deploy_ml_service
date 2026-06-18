@@ -63,6 +63,9 @@ target/
 *.db
 *.rdb
 
+# Generated model files
+models/lgb_model.txt
+
 # Pycharm
 .idea
 
