@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3 train train-smoke test
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -28,6 +28,18 @@ requirements: test_environment
 ## Make Dataset
 data: requirements
 	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
+
+## Train and register the production demand model
+train:
+	$(PYTHON_INTERPRETER) -m src.models.train_model
+
+## Run a fast end-to-end training smoke test
+train-smoke:
+	$(PYTHON_INTERPRETER) -m src.models.train_model --n-trials 1 --cv-splits 3 --max-estimators 300
+
+## Run focused training pipeline tests
+test:
+	$(PYTHON_INTERPRETER) -m unittest discover -s tests -v
 
 ## Delete all compiled Python files
 clean:

@@ -1,7 +1,7 @@
 from typing import Final
 
 MODEL_NAME: Final[str] = "lgb_for_inference"
-MODEL_STAGE: Final[str] = "Staging"
+MODEL_ALIAS: Final[str] = "champion"
 
 REQUIRED_INPUT_COLUMNS: Final[tuple[str, ...]] = (
     "dates",

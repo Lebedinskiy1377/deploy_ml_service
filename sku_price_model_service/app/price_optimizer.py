@@ -66,7 +66,7 @@ def optimize_price(
     Optimizes each SKU price by maximizing a GMV-based score with a margin penalty.
     """
     prices: pd.DataFrame = pd.read_sql_query(
-        "SELECT SKU, price_per_sku, cost FROM prices",
+        'SELECT "SKU", price_per_sku, cost FROM prices',
         engine,
     )
     data = pd.merge(data, prices, on="SKU", how="left")
