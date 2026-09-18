@@ -1,74 +1,38 @@
-# Training Application
+# Training
 
-Исследовательская и training-часть проекта динамического ценообразования.
+Обучение модели спроса для динамического ценообразования. Общая картина, запуск всего стека и API описаны в [README в корне](../README.md).
 
-## Назначение
+Целевая переменная — `num_purchases` (спрос в штуках). Признаки: календарь, SKU, цена, промо-скидка, товарная иерархия, поставщик, бренд, даты заведения и вывода SKU. Список признаков (`FEATURES` в `src/models/train_model.py`) совпадает с `sku_price_model_service/app/config.py`, это проверяют тесты.
 
-Модуль готовит данные по SKU, обучает модель спроса и регистрирует результат в MLflow для дальнейшего использования FastAPI-сервисом.
+## Запуск
 
-Основная целевая переменная:
-
-- `num_purchases` - спрос в штуках.
-
-Основные признаки:
-
-- дата и календарные признаки;
-- SKU;
-- цена;
-- промо/скидка;
-- товарная иерархия;
-- поставщик и бренд.
-
-## Структура
-
-- `src/data/` - сборка и очистка датасетов.
-- `src/models/` - обучение, метрики и offline prediction.
-- `data/raw/` и `data/processed/` - DVC-ссылки на данные.
-- `notebooks/` - исследовательские эксперименты.
-- `mlruns/` - исторические MLflow-артефакты.
-
-## Обучение
-
-Основной источник данных - `notebooks/data.csv`. Файл `train.csv` является старой производной выборкой из первых 90% строк и каноническим pipeline не используется.
-
-Рекомендуемый запуск из корня репозитория:
+Через Docker, из корня репозитория:
 
 ```bash
-docker compose run --rm trainer
+docker compose run --rm --build trainer                    # полное обучение
+docker compose run --rm --build trainer --n-trials 1 --cv-splits 3 --max-estimators 300
 ```
 
-Быстрый smoke-run:
+На хосте, из этой папки (`pip install -r requirements.txt`):
 
 ```bash
-docker compose run --rm trainer --n-trials 1 --cv-splits 3 --max-estimators 300
+python -m src.models.train_model --help
 ```
 
-Локальный запуск после установки `requirements-train.txt`:
+MLflow берётся из `MLFLOW_TRACKING_URI`, по умолчанию `http://localhost:5001` — MLflow из `docker compose`. Скрипт читает `.env` из корня репозитория, если он есть.
 
-```bash
-python -m src.models.train_model
-```
+## Pipeline
 
-Pipeline:
+1. Проверяет схему, пропуски, дубли `dates`/`SKU`, положительность цены и таргета.
+2. Делит данные по уникальным датам: последние 10% — holdout, одна дата не попадает в обе части.
+3. Подбирает гиперпараметры LightGBM через Optuna по SMAPE на `TimeSeriesSplit`.
+4. Ставит монотонное ограничение `-1` на цену; `margin` в признаки не входит.
+5. Считает MAE, RMSE, MAPE, SMAPE, WAPE и R2 на holdout.
+6. Переобучает модель на всём датасете, регистрирует `lgb_for_inference` и ставит alias `champion`.
 
-1. Проверяет схему, пропуски, дубли и допустимость цены/таргета.
-2. Исключает `margin` и использует явный feature contract, совпадающий с FastAPI.
-3. Делит данные по уникальным датам, не смешивая одну дату между train и validation.
-4. Подбирает LightGBM через Optuna по SMAPE.
-5. Использует монотонное ограничение `-1` для цены.
-6. Считает MAE, RMSE, MAPE, SMAPE, WAPE и R2 на holdout.
-7. Переобучает модель на полном датасете и регистрирует ее в MLflow.
+## Данные
 
-Скрипт использует `MLFLOW_TRACKING_URI`, если переменная задана. Локальный дефолт:
-
-```text
-http://localhost:5000
-```
-
-Обученная модель регистрируется в MLflow как `lgb_for_inference` и получает alias `champion`.
-
-Старый вход остается совместимым и запускает тот же pipeline:
-
-```bash
-python -m src.models.train_price
-```
+- `data/processed/sku_sales.csv` — датасет для обучения (6699 строк, 25 SKU).
+- `data/raw/*.dvc`, `data/processed/*.dvc` — DVC-указатели на сырые выгрузки; как получить доступ, описано в корневом README.
+- `src/data/make_dataset.py` — сборка объединённого датасета из сырых выгрузок; синтетическую колонку `margin` добавляет ноутбук `notebooks/sku.ipynb`.
+- `notebooks/` — исследования: EDA, XGBoost и CatBoost baseline'ы. Зависимости: `requirements-notebooks.txt`.
