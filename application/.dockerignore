@@ -3,7 +3,6 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-docs/
 mlruns/
 notebooks/*.ipynb
 notebooks/catboost_info/
