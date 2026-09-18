@@ -1,6 +1,4 @@
-.idea/
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.env
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+tests/

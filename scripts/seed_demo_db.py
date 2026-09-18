@@ -1,16 +1,22 @@
+"""Load the demo reference tables (promo, sku_dict, prices) into PostgreSQL."""
+
 import argparse
 import os
+from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine
 
+DEFAULT_DATA_PATH = Path(__file__).resolve().parents[1] / "application" / "data" / "processed" / "sku_sales.csv"
+
 
 def get_engine():
-    username = os.getenv("POSTGRES_USER", "root")
-    password = os.getenv("POSTGRES_PASSWORD", "root")
-    host = os.getenv("POSTGRES_HOST", "db")
-    port = int(os.getenv("POSTGRES_PORT", "5432"))
-    database = os.getenv("POSTGRES_DB", "test_db")
+    # Defaults match docker-compose.yml when the script runs on the host.
+    username = os.getenv("POSTGRES_USER", "pricing")
+    password = os.getenv("POSTGRES_PASSWORD", "pricing")
+    host = os.getenv("POSTGRES_HOST", "localhost")
+    port = int(os.getenv("POSTGRES_PORT", "5433"))
+    database = os.getenv("POSTGRES_DB", "pricing")
 
     return create_engine(f"postgresql://{username}:{password}@{host}:{port}/{database}")
 
@@ -69,7 +75,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Seed demo PostgreSQL tables for the pricing service.")
     parser.add_argument(
         "--data-path",
-        default="/workspace/application/data/processed/sku_sales.csv",
+        default=str(DEFAULT_DATA_PATH),
         help="Path to the source CSV with historical SKU observations.",
     )
     parser.add_argument(

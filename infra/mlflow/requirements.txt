@@ -1,0 +1,3 @@
+mlflow==3.1.4
+boto3==1.39.17
+psycopg2-binary==2.9.10

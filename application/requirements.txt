@@ -1,8 +1,9 @@
--r requirements-train.txt
-
-# Development and legacy utilities
-click>=8.1.7
-coverage
-flake8
-Sphinx
-xgboost
+# Training pipeline. Versions shared with the API are pinned identically in
+# sku_price_model_service/requirements.txt to avoid train/serve skew.
+lightgbm==4.6.0
+mlflow-skinny==3.1.4
+numpy==1.26.4
+optuna==4.2.1
+pandas==2.2.3
+python-dotenv==1.0.1
+scikit-learn==1.5.2

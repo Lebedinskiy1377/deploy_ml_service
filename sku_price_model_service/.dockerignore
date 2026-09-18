@@ -1,11 +1,4 @@
-.idea/
-Scripts/
-Lib/
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-.env
-mlruns/
-pyvenv.cfg
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+tests/

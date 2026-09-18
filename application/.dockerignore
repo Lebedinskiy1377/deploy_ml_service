@@ -1,8 +1,9 @@
-.dvc/cache/
-.idea/
-__pycache__/
-*.py[cod]
+**/__pycache__/
+**/*.py[cod]
+.dvc/
 .pytest_cache/
+data/raw/
 mlruns/
-notebooks/*.ipynb
-notebooks/catboost_info/
+models/
+notebooks/
+tests/

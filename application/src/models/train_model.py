@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -27,6 +28,7 @@ DEFAULT_MODEL_NAME = "lgb_for_inference"
 DEFAULT_MODEL_ALIAS = "champion"
 DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "processed" / "sku_sales.csv"
 DEFAULT_MODEL_OUTPUT = Path(__file__).resolve().parents[2] / "models" / "lgb_model.txt"
+DEFAULT_TRACKING_URI = "http://localhost:5001"
 
 CATEGORICAL_FEATURES = (
     "fincode",
@@ -275,6 +277,12 @@ def tune_hyperparameters(
     return build_model_params(study.best_trial, feature_names)
 
 
+def model_pip_requirements() -> list[str]:
+    """Pin the logged model to the exact library versions it was trained with."""
+    packages = ("lightgbm", "numpy", "pandas", "scikit-learn")
+    return [f"mlflow=={mlflow.__version__}", *(f"{name}=={metadata.version(name)}" for name in packages)]
+
+
 def register_model(
     model: lgb.LGBMRegressor,
     model_name: str,
@@ -282,16 +290,10 @@ def register_model(
 ) -> str:
     model_info = mlflow.lightgbm.log_model(
         model,
-        artifact_path="model",
+        name="model",
         registered_model_name=model_name,
         await_registration_for=120,
-        pip_requirements=[
-            "mlflow==2.13.2",
-            "lightgbm==4.6.0",
-            "numpy==1.26.4",
-            "pandas==2.2.3",
-            "scikit-learn==1.5.2",
-        ],
+        pip_requirements=model_pip_requirements(),
     )
     version = getattr(model_info, "registered_model_version", None)
     if version is None:
@@ -321,7 +323,7 @@ def train(
     model_alias: str = DEFAULT_MODEL_ALIAS,
     model_output: str | Path = DEFAULT_MODEL_OUTPUT,
 ) -> dict[str, Any]:
-    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", DEFAULT_TRACKING_URI)
     experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "dynamic-pricing-demand")
     mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(experiment_name)

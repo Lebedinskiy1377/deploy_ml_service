@@ -1,125 +1,132 @@
+name: dynamic-pricing
+
+# Every variable has a local-demo default, so `docker compose up` works without
+# a .env file. Copy .env.example to .env to override them.
+x-postgres-env: &postgres-env
+  POSTGRES_USER: ${POSTGRES_USER:-pricing}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pricing}
+  POSTGRES_DB: ${POSTGRES_DB:-pricing}
+
 services:
   db:
-    container_name: pg_container
-    image: postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      PGDATA: /data/postgres
-    volumes:
-      - postgres:/data/postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: *postgres-env
     ports:
       - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   minio:
-    container_name: minio
     image: quay.io/minio/minio:RELEASE.2022-05-08T23-50-31Z
-    command: server --console-address ":9001" /data
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     ports:
       - "9000:9000"
       - "9001:9001"
-    environment:
-      MINIO_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
-      MINIO_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
-      interval: 30s
-      timeout: 20s
-      retries: 3
     volumes:
-      - ./minio:/data
+      - minio-data:/data
 
   mlflow:
-    container_name: mlflow_server
-    restart: always
-    build: ./mlflow_image
-    image: mlflow_server
+    build: ./infra/mlflow
+    restart: unless-stopped
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-pricing}:${POSTGRES_PASSWORD:-pricing}@db:5432/mlflow
+      # Artifacts are proxied by the server, so only MLflow needs S3 credentials.
+      MLFLOW_ARTIFACTS_DESTINATION: s3://${MLFLOW_ARTIFACT_BUCKET:-mlflow}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MLFLOW_HOST: 0.0.0.0
+      MLFLOW_PORT: "5000"
     ports:
       - "5001:5000"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - MINIO_ROOT_USER=${AWS_ACCESS_KEY_ID}
-      - MINIO_ROOT_PASSWORD=${AWS_SECRET_ACCESS_KEY}
-      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
-    command: mlflow server --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db/${POSTGRES_DB} --default-artifact-root s3://${AWS_S3_BUCKET}/ --host 0.0.0.0
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
 
-  app:
-    container_name: fastapi
-    restart: always
+  api:
     build: ./sku_price_model_service
-    image: sku_price_model_service
+    restart: unless-stopped
     depends_on:
-      - db
-      - minio
-      - mlflow
+      db:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    environment:
+      <<: *postgres-env
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports:
       - "8005:8005"
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
-  front:
-    container_name: front
-    restart: always
+  frontend:
     build: ./frontend_ml
-    image: streamlit
+    restart: unless-stopped
     depends_on:
-      - app
+      api:
+        condition: service_healthy
+    environment:
+      FASTAPI_BASE_URL: http://api:8005
     ports:
       - "8501:8501"
-    environment:
-      - FASTAPI_BASE_URL=http://app:8005
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
+  # One-off jobs: docker compose run --rm seed | trainer
   seed:
-    image: sku_price_model_service
-    profiles:
-      - tools
+    build: ./sku_price_model_service
+    profiles: [tools]
     depends_on:
-      - db
-    entrypoint: ["python"]
-    command:
-      - /workspace/scripts/seed_demo_db.py
-      - --data-path
-      - /workspace/application/data/processed/sku_sales.csv
+      db:
+        condition: service_healthy
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
+      <<: *postgres-env
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    command: ["python", "/scripts/seed_demo_db.py", "--data-path", "/data/sku_sales.csv"]
     volumes:
-      - .:/workspace:ro
+      - ./scripts:/scripts:ro
+      - ./application/data/processed:/data:ro
 
   trainer:
     build: ./application
-    image: dynamic-pricing-trainer
-    profiles:
-      - tools
+    profiles: [tools]
     depends_on:
-      - minio
-      - mlflow
+      mlflow:
+        condition: service_healthy
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - MLFLOW_EXPERIMENT_NAME=dynamic-pricing-demand
-      - MLFLOW_S3_ENDPOINT_URL=http://minio:9000
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    volumes:
-      - .:/workspace
-
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENT_NAME: dynamic-pricing-demand
 
 volumes:
-  postgres:
+  pgdata:
+  minio-data:

@@ -1,0 +1,11 @@
+# Extra packages for the research notebooks and raw-data scripts (src/data).
+# Not needed for training or serving.
+-r requirements.txt
+catboost
+click
+dvc[s3]
+jupyterlab
+matplotlib
+psycopg2-binary
+sqlalchemy
+xgboost

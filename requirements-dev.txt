@@ -1,0 +1,7 @@
+# Everything needed to run the test suite and linters locally or in CI.
+-r application/requirements.txt
+-r sku_price_model_service/requirements.txt
+-r frontend_ml/requirements.txt
+httpx==0.28.1
+pytest==8.4.2
+ruff==0.12.12

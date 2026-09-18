@@ -1,14 +1,21 @@
-FROM python:3.11
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /workspace/application
+# LightGBM wheels link against the GNU OpenMP runtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY requirements-train.txt setup.py ./
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
 COPY src ./src
-RUN pip install --no-cache-dir -r requirements-train.txt
-
-COPY . .
+COPY data/processed/sku_sales.csv ./data/processed/sku_sales.csv
 
 ENTRYPOINT ["python", "-m", "src.models.train_model"]
