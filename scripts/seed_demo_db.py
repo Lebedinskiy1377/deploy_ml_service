@@ -69,7 +69,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Seed demo PostgreSQL tables for the pricing service.")
     parser.add_argument(
         "--data-path",
-        default="/workspace/application/notebooks/data.csv",
+        default="/workspace/application/data/processed/sku_sales.csv",
         help="Path to the source CSV with historical SKU observations.",
     )
     parser.add_argument(

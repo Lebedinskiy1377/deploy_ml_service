@@ -25,7 +25,7 @@ RANDOM_STATE = 42
 DEFAULT_TRAIN_FRACTION = 0.9
 DEFAULT_MODEL_NAME = "lgb_for_inference"
 DEFAULT_MODEL_ALIAS = "champion"
-DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "notebooks" / "data.csv"
+DEFAULT_DATA_PATH = Path(__file__).resolve().parents[2] / "data" / "processed" / "sku_sales.csv"
 DEFAULT_MODEL_OUTPUT = Path(__file__).resolve().parents[2] / "models" / "lgb_model.txt"
 
 CATEGORICAL_FEATURES = (

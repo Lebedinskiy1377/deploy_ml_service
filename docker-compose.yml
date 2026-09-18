@@ -93,7 +93,7 @@ services:
     command:
       - /workspace/scripts/seed_demo_db.py
       - --data-path
-      - /workspace/application/notebooks/data.csv
+      - /workspace/application/data/processed/sku_sales.csv
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
