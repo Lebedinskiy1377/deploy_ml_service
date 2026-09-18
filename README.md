@@ -143,9 +143,12 @@ make lint      # make format исправит стиль
 Запуск компонентов на хосте против стека из Docker (значения по умолчанию совпадают с портами compose):
 
 ```bash
+docker compose stop api                                          # освободить порт 8005
 cd sku_price_model_service && uvicorn app.main:app --port 8005
 cd application && python -m src.models.train_model --n-trials 1
 ```
+
+Свои значения из `.env` trainer читает сам, для API и seed их нужно экспортировать: `set -a; . ./.env; set +a`.
 
 CI (GitHub Actions) гоняет ruff, тесты и end-to-end прогон `docker compose`: подъём стека, seed, обучение и запрос к API.
 
