@@ -143,7 +143,11 @@ def main() -> None:
     if uploaded_file is None:
         return
 
-    data = pd.read_csv(uploaded_file)
+    try:
+        data = pd.read_csv(uploaded_file)
+    except (pd.errors.EmptyDataError, pd.errors.ParserError, UnicodeDecodeError) as exc:
+        st.error(f"Could not read the CSV file (expected UTF-8 with comma separators): {exc}")
+        return
     st.write("Uploaded Data:")
     st.dataframe(data)
 
