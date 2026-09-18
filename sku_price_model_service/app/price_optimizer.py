@@ -1,130 +1,98 @@
-import logging
-from typing import Any
+"""Pick the price that maximises GMV with a penalty for margins below target.
+
+For every price candidate:
+score = price * demand * (1 - margin_penalty * max(0, target_margin - margin)),
+where margin = (price - cost) / price.
+"""
+
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
-from config import (
-    CATEGORICAL_FEATURES,
+from .config import (
     DEFAULT_MARGIN_PENALTY,
     DEFAULT_PRICE_CANDIDATE_COUNT,
     DEFAULT_PRICE_CHANGE_LIMIT,
     DEFAULT_TARGET_MARGIN,
-    FEATURES,
 )
-from db import engine
-from demand_predictor import DemandPredictor
-
-logger = logging.getLogger(__name__)
+from .demand_predictor import DemandPredictor
 
 
-def _prepare_model_row(row: pd.Series) -> pd.DataFrame:
-    row_data = pd.DataFrame([{feature: row[feature] for feature in FEATURES}])
+@dataclass(frozen=True)
+class OptimizationSettings:
+    price_change_limit: float = DEFAULT_PRICE_CHANGE_LIMIT  # candidates within +-30% of the base price
+    candidate_count: int = DEFAULT_PRICE_CANDIDATE_COUNT
+    margin_penalty: float = DEFAULT_MARGIN_PENALTY  # lambda in the score formula
+    target_margin: float = DEFAULT_TARGET_MARGIN
 
-    row_data["SKU"] = row_data["SKU"].astype(np.int64)
-    row_data["week_num"] = row_data["week_num"].astype(np.uint32)
-    row_data["year"] = row_data["year"].astype(np.int32)
-    row_data["discount"] = row_data["discount"].astype(np.float64)
-    row_data["week_num_expiration"] = row_data["week_num_expiration"].astype(np.uint32)
-    row_data["year_expiration"] = row_data["year_expiration"].astype(np.int32)
-    row_data["week_num_creation"] = row_data["week_num_creation"].astype(np.uint32)
-    row_data["year_creation"] = row_data["year_creation"].astype(np.int32)
-    row_data["day"] = row_data["day"].astype(np.int32)
-    row_data["month"] = row_data["month"].astype(np.int32)
-    row_data["weekday"] = row_data["weekday"].astype(np.int32)
-    row_data["price"] = row_data["price"].astype(np.float64)
-
-    for column in CATEGORICAL_FEATURES:
-        row_data[column] = row_data[column].astype("category")
-
-    return row_data
+    def __post_init__(self) -> None:
+        if not 0 <= self.price_change_limit < 1:
+            raise ValueError("price_change_limit must be in [0, 1)")
+        if self.candidate_count < 2:
+            raise ValueError("candidate_count must be at least 2")
 
 
-def _score_candidate(
-    price: float,
-    demand: float,
-    cost: float,
-    lambda_param: float,
-    target_margin: float,
-) -> tuple[float, float]:
-    margin = (price - cost) / price if price > 0 else 0.0
-    penalty = lambda_param * max(0.0, target_margin - margin)
-    score = price * demand * (1 - penalty)
-
-    return score, margin
+def margin_share(price: np.ndarray, cost: np.ndarray) -> np.ndarray:
+    price, cost = np.broadcast_arrays(np.asarray(price, dtype=float), np.asarray(cost, dtype=float))
+    return np.divide(price - cost, price, out=np.zeros_like(price), where=price > 0)
 
 
-def optimize_price(
-    data: pd.DataFrame,
-    predictor: DemandPredictor,
-    lambda_param: float = DEFAULT_MARGIN_PENALTY,
-    target_margin: float = DEFAULT_TARGET_MARGIN,
-    price_change_limit: float = DEFAULT_PRICE_CHANGE_LIMIT,
-    price_candidate_count: int = DEFAULT_PRICE_CANDIDATE_COUNT,
-) -> pd.DataFrame:
-    """
-    Optimizes each SKU price by maximizing a GMV-based score with a margin penalty.
-    """
-    prices: pd.DataFrame = pd.read_sql_query(
-        'SELECT "SKU", price_per_sku, cost FROM prices',
-        engine,
+def penalized_gmv(
+    price: np.ndarray,
+    demand: np.ndarray,
+    cost: np.ndarray,
+    settings: OptimizationSettings,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (score, margin) for every price candidate."""
+    margin = margin_share(price, cost)
+    penalty = settings.margin_penalty * np.maximum(0.0, settings.target_margin - margin)
+    return price * demand * (1.0 - penalty), margin
+
+
+def price_grid(base_price: np.ndarray, settings: OptimizationSettings) -> np.ndarray:
+    multipliers = np.linspace(
+        1 - settings.price_change_limit,
+        1 + settings.price_change_limit,
+        settings.candidate_count,
     )
-    data = pd.merge(data, prices, on="SKU", how="left")
+    return np.asarray(base_price, dtype=float)[:, None] * multipliers[None, :]
 
-    if data[["price_per_sku", "cost"]].isna().any(axis=None):
-        missing_skus = data.loc[
-            data[["price_per_sku", "cost"]].isna().any(axis=1),
-            "SKU",
-        ].unique()
-        raise ValueError(f"Missing price or cost data for SKU: {', '.join(map(str, missing_skus))}")
 
-    data["base_demand"] = predictor.predict(data[list(FEATURES)])
+def optimize_prices(
+    features: pd.DataFrame,
+    costs: pd.Series,
+    predictor: DemandPredictor,
+    settings: OptimizationSettings | None = None,
+) -> pd.DataFrame:
+    """Best price per row of `features`; the base scenario is the price from the request."""
+    settings = settings or OptimizationSettings()
+    base_price = features["price"].to_numpy(dtype=float)
+    cost = costs.to_numpy(dtype=float)
 
-    results: list[dict[str, Any]] = []
-    for _, row in data.iterrows():
-        sku = int(row["SKU"])
-        base_price = float(row["price"])
-        cost = float(row["cost"])
+    grid = price_grid(base_price, settings)
+    demand = predictor.demand_curves(features, grid)
+    score, margin = penalized_gmv(grid, demand, cost[:, None], settings)
 
-        if base_price <= 0:
-            raise ValueError(f"Base price must be greater than zero for SKU {sku}")
+    rows = np.arange(len(features))
+    best = np.argmax(score, axis=1)
+    optimal_price = grid[rows, best]
+    expected_demand = demand[rows, best]
+    base_demand = predictor.predict(features)
 
-        price_candidates = np.linspace(
-            base_price * (1 - price_change_limit),
-            base_price * (1 + price_change_limit),
-            price_candidate_count,
-        )
-
-        row_data = _prepare_model_row(row)
-        demands = predictor.adjust_demand_with_price(row_data, price_candidates)
-        demands = np.nan_to_num(demands, nan=0.0, posinf=0.0, neginf=0.0)
-        logger.debug("SKU %s candidate prices=%s demands=%s", sku, price_candidates, demands)
-
-        scores = np.zeros_like(price_candidates)
-        margins = np.zeros_like(price_candidates)
-        for idx, (price, demand) in enumerate(zip(price_candidates, demands)):
-            scores[idx], margins[idx] = _score_candidate(
-                price=float(price),
-                demand=float(demand),
-                cost=cost,
-                lambda_param=lambda_param,
-                target_margin=target_margin,
-            )
-
-        best_idx = int(np.argmax(scores))
-        best_price = float(price_candidates[best_idx])
-        best_demand = float(demands[best_idx])
-
-        results.append(
-            {
-                "SKU": sku,
-                "optimal_price": best_price,
-                "expected_demand": best_demand,
-                "gmv": best_price * best_demand,
-                "margin": float(margins[best_idx]),
-                "score": float(scores[best_idx]),
-                "base_demand": float(row["base_demand"]),
-            }
-        )
-
-    return pd.DataFrame(results).merge(prices, on="SKU", how="left")
+    return pd.DataFrame(
+        {
+            "SKU": features["SKU"].to_numpy(),
+            "price_per_sku": base_price,
+            "cost": cost,
+            "base_demand": base_demand,
+            "base_gmv": base_price * base_demand,
+            "base_margin": margin_share(base_price, cost),
+            "optimal_price": optimal_price,
+            "expected_demand": expected_demand,
+            "gmv": optimal_price * expected_demand,
+            "margin": margin[rows, best],
+            "score": score[rows, best],
+        },
+        index=features.index,
+    )

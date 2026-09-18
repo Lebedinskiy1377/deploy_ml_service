@@ -1,7 +1,15 @@
+"""Service settings and the feature contract shared with the training pipeline.
+
+FEATURES and CATEGORICAL_FEATURES must match application/src/models/train_model.py;
+a test in the training suite checks that they do.
+"""
+
+import os
 from typing import Final
 
-MODEL_NAME: Final[str] = "lgb_for_inference"
-MODEL_ALIAS: Final[str] = "champion"
+MLFLOW_TRACKING_URI: Final[str] = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
+MODEL_NAME: Final[str] = os.getenv("MODEL_NAME", "lgb_for_inference")
+MODEL_ALIAS: Final[str] = os.getenv("MODEL_ALIAS", "champion")
 
 REQUIRED_INPUT_COLUMNS: Final[tuple[str, ...]] = (
     "dates",
