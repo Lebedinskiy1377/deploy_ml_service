@@ -1,0 +1,24 @@
+# Tooling configuration for the whole repository. Each component keeps its own
+# requirements.txt and Dockerfile; this file only configures ruff and pytest.
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["application/notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "src"]
+
+[tool.pytest.ini_options]
+testpaths = ["application/tests", "sku_price_model_service/tests"]
+pythonpath = ["application", "sku_price_model_service"]
+addopts = "-ra --import-mode=importlib"
+filterwarnings = [
+    # Deprecations raised inside third-party packages, not in this code base.
+    "ignore::DeprecationWarning:starlette.*",
+    "ignore::DeprecationWarning:matplotlib.*",
+    "ignore::DeprecationWarning:mlflow.*",
+]

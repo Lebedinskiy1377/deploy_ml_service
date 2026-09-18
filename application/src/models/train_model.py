@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from collections.abc import Iterator
 from importlib import metadata
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import lightgbm as lgb
 import mlflow

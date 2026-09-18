@@ -5,20 +5,34 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import create_engine
+from sqlalchemy import URL, Engine, create_engine
 
 DEFAULT_DATA_PATH = Path(__file__).resolve().parents[1] / "application" / "data" / "processed" / "sku_sales.csv"
 
+SKU_DICT_COLUMNS = [
+    "SKU",
+    "fincode",
+    "ui1_code",
+    "ui2_code",
+    "ui3_code",
+    "vendor",
+    "brand_code",
+    "creation_date",
+    "expiration_date",
+]
 
-def get_engine():
+
+def get_engine() -> Engine:
     # Defaults match docker-compose.yml when the script runs on the host.
-    username = os.getenv("POSTGRES_USER", "pricing")
-    password = os.getenv("POSTGRES_PASSWORD", "pricing")
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = int(os.getenv("POSTGRES_PORT", "5433"))
-    database = os.getenv("POSTGRES_DB", "pricing")
-
-    return create_engine(f"postgresql://{username}:{password}@{host}:{port}/{database}")
+    url = URL.create(
+        "postgresql+psycopg2",
+        username=os.getenv("POSTGRES_USER", "pricing"),
+        password=os.getenv("POSTGRES_PASSWORD", "pricing"),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5433")),
+        database=os.getenv("POSTGRES_DB", "pricing"),
+    )
+    return create_engine(url)
 
 
 def build_prices(data: pd.DataFrame) -> pd.DataFrame:
@@ -38,37 +52,21 @@ def build_prices(data: pd.DataFrame) -> pd.DataFrame:
     return latest_prices[["SKU", "price_per_sku", "cost"]].drop_duplicates("SKU")
 
 
-def seed_database(data_path: str, if_exists: str) -> None:
-    data = pd.read_csv(data_path)
-
+def build_reference_tables(data: pd.DataFrame) -> dict[str, pd.DataFrame]:
+    """Derive the promo calendar, SKU dictionary and current prices from sales history."""
     promo = data[["SKU", "year", "week_num", "discount"]].drop_duplicates()
-    sku_dict = (
-        data[
-            [
-                "SKU",
-                "fincode",
-                "ui1_code",
-                "ui2_code",
-                "ui3_code",
-                "vendor",
-                "brand_code",
-                "creation_date",
-                "expiration_date",
-            ]
-        ]
-        .drop_duplicates("SKU")
-        .rename(columns={"SKU": "sku_id"})
-    )
-    prices = build_prices(data)
+    sku_dict = data[SKU_DICT_COLUMNS].drop_duplicates("SKU").rename(columns={"SKU": "sku_id"})
 
-    engine = get_engine()
-    promo.to_sql("promo", engine, if_exists=if_exists, index=False)
-    sku_dict.to_sql("sku_dict", engine, if_exists=if_exists, index=False)
-    prices.to_sql("prices", engine, if_exists=if_exists, index=False)
+    return {"promo": promo, "sku_dict": sku_dict, "prices": build_prices(data)}
 
-    print(f"Seeded promo: {len(promo)} rows")
-    print(f"Seeded sku_dict: {len(sku_dict)} rows")
-    print(f"Seeded prices: {len(prices)} rows")
+
+def seed_database(data_path: str, if_exists: str, engine: Engine | None = None) -> None:
+    tables = build_reference_tables(pd.read_csv(data_path))
+    engine = engine or get_engine()
+
+    for name, table in tables.items():
+        table.to_sql(name, engine, if_exists=if_exists, index=False)
+        print(f"Seeded {name}: {len(table)} rows")
 
 
 def parse_args():
