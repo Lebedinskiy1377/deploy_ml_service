@@ -20,11 +20,22 @@ def test_without_margin_penalty_maximises_gmv(reference_data, predictor):
 
     result = optimize_prices(features, costs, predictor, NO_MARGIN_PENALTY)
 
-    step = np.diff(price_grid(np.array([90.0]), NO_MARGIN_PENALTY)[0])[0]
+    step = np.diff(price_grid(np.array([90.0]), NO_MARGIN_PENALTY)[0]).max()
     optimal = result["optimal_price"].iloc[0]
     assert abs(optimal - 100.0) <= step / 2
     assert result["expected_demand"].iloc[0] == pytest.approx(200.0 - optimal)
     assert result["gmv"].iloc[0] == pytest.approx(optimal * (200.0 - optimal))
+
+
+def test_keeps_the_current_price_when_it_is_already_optimal(reference_data, predictor):
+    # GMV of demand = 200 - price peaks exactly at the requested price.
+    features = features_with_price(reference_data, 100.0)
+    costs = pd.Series([30.0], index=features.index)
+
+    result = optimize_prices(features, costs, predictor, NO_MARGIN_PENALTY)
+
+    assert result["optimal_price"].iloc[0] == pytest.approx(100.0)
+    assert result["gmv"].iloc[0] == pytest.approx(result["base_gmv"].iloc[0])
 
 
 def test_margin_penalty_moves_price_up_when_margin_is_below_target(reference_data, predictor):

@@ -31,7 +31,8 @@ def _parse_sku(values: pd.Series) -> pd.Series:
 
 
 def _parse_dates(values: pd.Series, column: str) -> pd.Series:
-    dates = pd.to_datetime(values, errors="coerce")
+    # Parse text: integer dates such as 20191224 would otherwise be read as nanoseconds since 1970.
+    dates = pd.to_datetime(values.astype(str), errors="coerce")
     invalid = dates.isna()
     if invalid.any():
         raise ValueError(f"Column {column} must contain dates, got: {_preview(values[invalid])}")

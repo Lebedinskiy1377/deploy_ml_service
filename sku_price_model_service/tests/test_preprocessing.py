@@ -29,6 +29,15 @@ def test_uses_training_dtypes(request_frame, reference_data):
     assert features["price"].dtype == features["discount"].dtype == "float64"
 
 
+def test_reads_integer_dates_as_yyyymmdd(request_frame, reference_data):
+    request_frame["dates"] = [20191224, 20190601]
+
+    features = build_features(request_frame, reference_data)
+
+    assert list(features["year"]) == [2019, 2019]
+    assert list(features["week_num"]) == [52, 22]
+
+
 def test_keeps_the_index_of_the_request(request_frame, reference_data):
     request_frame.index = [10, 3]
 

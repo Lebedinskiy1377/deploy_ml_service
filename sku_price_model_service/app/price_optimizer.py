@@ -51,10 +51,10 @@ def penalized_gmv(
 
 
 def price_grid(base_price: np.ndarray, settings: OptimizationSettings) -> np.ndarray:
-    multipliers = np.linspace(
-        1 - settings.price_change_limit,
-        1 + settings.price_change_limit,
-        settings.candidate_count,
+    """Candidates per row: an even grid within +-price_change_limit plus the base price itself."""
+    multipliers = np.union1d(
+        np.linspace(1 - settings.price_change_limit, 1 + settings.price_change_limit, settings.candidate_count),
+        [1.0],  # keeping the current price must always be an option
     )
     return np.asarray(base_price, dtype=float)[:, None] * multipliers[None, :]
 
