@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install ruff==0.12.12
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            application/requirements.txt
+            sku_price_model_service/requirements.txt
+            frontend_ml/requirements.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+
+  e2e:
+    name: docker compose end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start the stack
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Seed the reference tables
+        run: docker compose run --rm seed
+      - name: Train a quick model
+        run: docker compose run --rm trainer --n-trials 1 --cv-splits 3 --max-estimators 100
+      - name: Optimise prices through the API
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -F "file=@examples/request.csv" http://localhost:8005/optimize_price -o response.json
+          python3 -c "import json; rows = json.load(open('response.json')); assert len(rows) == 25 and all(r['optimal_price'] > 0 for r in rows), rows; print(len(rows), 'SKUs optimised')"
+      - name: Check the UI
+        run: curl --fail --silent --show-error http://localhost:8501/_stcore/health
+      - name: Show logs
+        if: failure()
+        run: docker compose --profile tools logs --no-color
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
