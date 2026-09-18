@@ -24,6 +24,8 @@ def test_train_registers_a_champion_that_respects_price_monotonicity(tmp_path, m
     assert set(result["metrics"]) == {"MAE", "RMSE", "MAPE", "SMAPE", "WAPE", "r2_score"}
     client = MlflowClient(tracking_uri=tracking_uri)
     assert str(client.get_model_version_by_alias("lgb_for_inference", "champion").version) == "1"
+    params = client.get_run(result["run_id"]).data.params
+    assert params["early_stopping_cutoff_date"] < params["cutoff_date"], "holdout must not drive early stopping"
 
     mlflow.set_tracking_uri(tracking_uri)
     model = mlflow.pyfunc.load_model("models:/lgb_for_inference@champion")

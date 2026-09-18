@@ -94,7 +94,7 @@ curl -F "file=@examples/request.csv" http://localhost:8005/optimize_price
 
 Модель спроса обучается на `application/data/processed/sku_sales.csv`: 6699 наблюдений, 25 SKU, 2018-01-17 — 2019-12-24.
 
-- Последние 10% дат — holdout, более ранние — time-series CV и подбор гиперпараметров Optuna по SMAPE.
+- Последние 10% дат — holdout, более ранние — time-series CV и подбор гиперпараметров Optuna по SMAPE. Holdout не используется ни для подбора, ни для early stopping.
 - `margin` не попадает в признаки. У цены монотонное ограничение `-1`: при прочих равных рост цены не повышает прогноз спроса.
 - После оценки на holdout модель переобучается на всём датасете, регистрируется в MLflow как `lgb_for_inference` и получает alias `champion`.
 - API загружает `champion` при первом запросе и держит в памяти; после переобучения API нужно перезапустить (`make train` делает это сам).

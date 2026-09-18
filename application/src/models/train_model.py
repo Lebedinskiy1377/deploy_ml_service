@@ -331,6 +331,9 @@ def train(
 
     data = load_training_data(train_path, target)
     train_data, holdout_data, cutoff_date = temporal_holdout_split(data, train_fraction)
+    # Early stopping watches the last dates of the training period, so the holdout stays unseen
+    # until the final evaluation.
+    fit_data, early_stopping_data, early_stopping_cutoff = temporal_holdout_split(train_data, train_fraction)
     feature_names = list(FEATURES)
     elasticity = calculate_price_elasticity(train_data, target)
 
@@ -360,6 +363,8 @@ def train(
                 "cutoff_date": cutoff_date.date().isoformat(),
                 "train_rows": len(train_data),
                 "holdout_rows": len(holdout_data),
+                "early_stopping_cutoff_date": early_stopping_cutoff.date().isoformat(),
+                "early_stopping_rows": len(early_stopping_data),
                 "cv_splits": cv_splits,
                 "optuna_trials": n_trials,
                 "features": json.dumps(feature_names),
@@ -370,19 +375,22 @@ def train(
         if np.isfinite(elasticity):
             mlflow.log_metric("observed_price_elasticity", elasticity)
 
-        evaluation_model = lgb.LGBMRegressor(**best_params, n_estimators=max_estimators)
-        evaluation_model.fit(
-            train_data[feature_names],
-            train_data[target],
-            eval_set=[(holdout_data[feature_names], holdout_data[target])],
+        early_stopping_model = lgb.LGBMRegressor(**best_params, n_estimators=max_estimators)
+        early_stopping_model.fit(
+            fit_data[feature_names],
+            fit_data[target],
+            eval_set=[(early_stopping_data[feature_names], early_stopping_data[target])],
             callbacks=[lgb.early_stopping(early_stopping_rounds, verbose=False)],
         )
+        best_iteration = early_stopping_model.best_iteration_ or max_estimators
+        mlflow.log_param("best_iteration", best_iteration)
+
+        # Same recipe as the final model (fixed number of trees), fitted on everything before the holdout.
+        evaluation_model = lgb.LGBMRegressor(**best_params, n_estimators=best_iteration)
+        evaluation_model.fit(train_data[feature_names], train_data[target])
         holdout_prediction = evaluation_model.predict(holdout_data[feature_names])
         metrics = regression_metrics(holdout_data[target], holdout_prediction)
         mlflow.log_metrics({f"holdout_{name}": value for name, value in metrics.items()})
-
-        best_iteration = evaluation_model.best_iteration_ or max_estimators
-        mlflow.log_param("best_iteration", best_iteration)
 
         final_model = lgb.LGBMRegressor(**best_params, n_estimators=best_iteration)
         final_model.fit(data[feature_names], data[target])
