@@ -54,7 +54,9 @@ def build_prices(data: pd.DataFrame) -> pd.DataFrame:
 
 def build_reference_tables(data: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Derive the promo calendar, SKU dictionary and current prices from sales history."""
-    promo = data[["SKU", "year", "week_num", "discount"]].drop_duplicates()
+    # Only real promotions: for weeks without one the API falls back to the discount
+    # sent with the request, or to 1.0 (no discount).
+    promo = data.loc[data["discount"] != 1.0, ["SKU", "year", "week_num", "discount"]].drop_duplicates()
     sku_dict = data[SKU_DICT_COLUMNS].drop_duplicates("SKU").rename(columns={"SKU": "sku_id"})
 
     return {"promo": promo, "sku_dict": sku_dict, "prices": build_prices(data)}
