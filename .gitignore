@@ -17,7 +17,7 @@ env/
 htmlcov/
 .ipynb_checkpoints/
 
-# Local configuration and secrets (DVC credentials live in .dvc/config.local)
+# Local configuration and secrets
 .env
 .env.*
 !.env.example
@@ -33,14 +33,3 @@ mlruns/
 mlartifacts/
 catboost_info/
 application/models/
-
-# Legacy local state: MinIO data now lives in a named Docker volume
-/minio/
-
-# In-place Windows virtualenv that used to be committed here
-/sku_price_model_service/Scripts/
-/sku_price_model_service/Lib/
-/sku_price_model_service/Include/
-/sku_price_model_service/include/
-/sku_price_model_service/share/
-pyvenv.cfg

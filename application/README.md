@@ -1,38 +1,38 @@
 # Training
 
-Обучение модели спроса для динамического ценообразования. Общая картина, запуск всего стека и API описаны в [README в корне](../README.md).
+Trains the demand model for dynamic pricing. See the [root README](../README.md) for the whole stack and the API.
 
-Целевая переменная — `num_purchases` (спрос в штуках). Признаки: календарь, SKU, цена, промо-скидка, товарная иерархия, поставщик, бренд, даты заведения и вывода SKU. Список признаков (`FEATURES` в `src/models/train_model.py`) совпадает с `sku_price_model_service/app/config.py`, это проверяют тесты.
+The target is `num_purchases` (units sold). Features: calendar, SKU, price, promo discount, product hierarchy, vendor, brand, SKU creation and expiration dates. The feature list (`FEATURES` in `src/models/train_model.py`) matches `sku_price_model_service/app/config.py`; tests keep them in sync.
 
-## Запуск
+## Run
 
-Через Docker, из корня репозитория:
+With Docker, from the repository root:
 
 ```bash
-docker compose run --rm --build trainer                    # полное обучение
+docker compose run --rm --build trainer                    # full training
 docker compose run --rm --build trainer --n-trials 1 --cv-splits 3 --max-estimators 300
 ```
 
-На хосте, из этой папки (`pip install -r requirements.txt`):
+On the host, from this folder (`pip install -r requirements.txt`):
 
 ```bash
 python -m src.models.train_model --help
 ```
 
-MLflow берётся из `MLFLOW_TRACKING_URI`, по умолчанию `http://localhost:5001` — MLflow из `docker compose`. Скрипт читает `.env` из корня репозитория, если он есть.
+The MLflow server is taken from `MLFLOW_TRACKING_URI`, `http://localhost:5001` by default (MLflow from `docker compose`). The script reads `.env` from the repository root if it exists.
 
 ## Pipeline
 
-1. Проверяет схему, пропуски, дубли `dates`/`SKU`, положительность цены и таргета.
-2. Делит данные по уникальным датам: последние 10% — holdout, одна дата не попадает в обе части.
-3. Подбирает гиперпараметры LightGBM через Optuna по SMAPE на `TimeSeriesSplit`.
-4. Ставит монотонное ограничение `-1` на цену; `margin` в признаки не входит.
-5. Подбирает число деревьев early stopping'ом на последних 10% дат обучающей части, переобучает модель на всей обучающей части и считает MAE, RMSE, MAPE, SMAPE, WAPE и R2 на holdout. Holdout не участвует ни в подборе гиперпараметров, ни в early stopping.
-6. Переобучает модель на всём датасете, регистрирует `lgb_for_inference` и ставит alias `champion`.
+1. Validates the schema, missing values, duplicate `dates`/`SKU` rows and that price and target are positive.
+2. Splits by unique dates: the last 10% of dates form the holdout, so no date lands in both parts.
+3. Tunes LightGBM hyperparameters with Optuna on `TimeSeriesSplit`, optimising SMAPE.
+4. Applies a monotonic constraint (`-1`) on price; `margin` is not a feature.
+5. Picks the number of trees by early stopping on the last 10% of the training period, refits on the whole training period and reports MAE, RMSE, MAPE, SMAPE, WAPE and R2 on the holdout. The holdout is used neither for tuning nor for early stopping.
+6. Retrains on the full dataset, registers `lgb_for_inference` and sets the `champion` alias.
 
-## Данные
+## Data
 
-- `data/processed/sku_sales.csv` — датасет для обучения (6699 строк, 25 SKU).
-- `data/raw/*.dvc`, `data/processed/*.dvc` — DVC-указатели на сырые выгрузки; как получить доступ, описано в корневом README.
-- `src/data/make_dataset.py` — сборка объединённого датасета из сырых выгрузок; синтетическую колонку `margin` добавляет ноутбук `notebooks/sku.ipynb`.
-- `notebooks/` — исследования: EDA, XGBoost и CatBoost baseline'ы. Зависимости: `requirements-notebooks.txt`.
+- `data/processed/sku_sales.csv`: the training dataset (6,699 rows, 25 SKUs).
+- `data/raw/*.dvc`, `data/processed/*.dvc`: DVC pointers to the raw exports.
+- `src/data/make_dataset.py`: builds the merged dataset from the raw exports; the notebook `notebooks/sku.ipynb` adds the synthetic `margin` column.
+- `notebooks/`: research (EDA, XGBoost and CatBoost baselines). Dependencies: `requirements-notebooks.txt`.
