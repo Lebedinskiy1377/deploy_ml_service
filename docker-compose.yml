@@ -25,7 +25,9 @@ services:
       retries: 20
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2022-05-08T23-50-31Z
+    # MinIO no longer publishes public images; SILO is the community-maintained
+    # MinIO fork with the same API, CLI flags and environment variables.
+    image: docker.io/pgsty/silo:RELEASE.2026-09-03T13-18-01Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
@@ -52,9 +54,6 @@ services:
       MLFLOW_S3_ENDPOINT_URL: http://minio:9000
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
-      # This MinIO release predates the checksum headers boto3 >= 1.36 sends by default.
-      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
       MLFLOW_HOST: 0.0.0.0
       MLFLOW_PORT: "5000"
     ports:
