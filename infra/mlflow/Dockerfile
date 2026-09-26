@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-COPY requirements.txt /tmp/requirements.txt
+COPY requirements.txt constraints.txt /tmp/
 RUN pip install -r /tmp/requirements.txt
 
 COPY entrypoint.py /usr/local/bin/mlflow-entrypoint.py

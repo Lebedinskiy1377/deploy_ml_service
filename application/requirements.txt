@@ -1,5 +1,6 @@
 # Training pipeline. Versions shared with the API are pinned identically in
 # sku_price_model_service/requirements.txt to avoid train/serve skew.
+-c constraints.txt
 lightgbm==4.6.0
 mlflow-skinny==3.1.4
 numpy==1.26.4
